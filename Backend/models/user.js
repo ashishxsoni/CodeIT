@@ -23,8 +23,7 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
     profileImage: { 
-      type: String, 
-      default: "/images/default-profile.png" },
+      type: String },
   },
   { timestamps: true }
 );
@@ -32,7 +31,7 @@ const userSchema = new mongoose.Schema(
 // Pre-save hook for hashing the password
 userSchema.pre("save", function (next) {
   const user = this; // Reference to the current document
-  console.log("Before hashing: ", user);
+  // console.log("Before hashing: ", user);
 
   // Only hash the password if it has been modified or is new
   if (!user.isModified("password")) return next() ;
@@ -49,7 +48,7 @@ userSchema.pre("save", function (next) {
     // salt is like a secret for each user of 16 digit ki  
     // Hash the password using the salt
     user.password = hashedPassword;
-    console.log("after User : " ,user);
+    // console.log("after User : " ,user);
     return next();
   } catch (err) {
     console.log("Error in Scheme Pre:" , err);
@@ -62,21 +61,24 @@ userSchema.pre("save", function (next) {
 userSchema.static("matchPasswordAndGenerateToken", async function (email, password) {
   try {
     const user = await this.findOne({ email });
-    if (!user) return null; // Return null instead of throwing an error
+    if (!user) {
+      throw new Error("User not found. Please check your email.");
+    }
 
-    // Hash the provided password using stored salt
+    // 🔐 Hash the provided password using stored salt
     const userProvidedHash = crypto.createHmac("sha256", user.salt)
       .update(password)
       .digest("hex");
 
-    // Compare stored hash with provided hash
-    if (user.password !== userProvidedHash) return null; // Return null if password is incorrect
+    // 🔑 Compare stored hash with provided hash
+    if (user.password !== userProvidedHash) {
+      throw new Error("Incorrect password. Please try again.");
+    }
 
-    // Generate Token
-    return createTokenForUser(user);
+    const token = createTokenForUser(user);
+    return { token, user };
   } catch (error) {
-    console.error("Error in password validation:", error.message);
-    return null;
+    throw new Error(error.message || "An error occurred during authentication.");
   }
 });
 

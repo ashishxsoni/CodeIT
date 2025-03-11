@@ -7,7 +7,7 @@ function createTokenForUser(user) {
     _id: user._id,
     email: user.email,
     fullname:user.fullname,
-    profileImageURL: user.profileImageURL,
+    profileImage: user.profileImage,
   };
   const token = JWT.sign(payload, secret ,{
     expiresIn: "1d",

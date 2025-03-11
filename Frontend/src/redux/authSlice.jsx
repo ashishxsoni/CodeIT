@@ -1,33 +1,74 @@
-// src/redux/authSlice.js
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
 
 const initialState = {
-  isAuthenticated: false,
-  user: null,
-  isProfilePanelOpen: false
+  isAuth: false,
+  userData: null,
+  isLoading: true, // New state to track authentication loading
 };
 
-export const authSlice = createSlice({
-  name: 'auth',
+const authSlice = createSlice({
+  name: "auth",
   initialState,
   reducers: {
     login: (state, action) => {
-      state.isAuthenticated = true;
-      state.user = action.payload;
+      state.isAuth = true;
+      state.userData = action.payload;
+      state.isLoading = false;
     },
     logout: (state) => {
-      state.isAuthenticated = false;
-      state.user = null;
-      state.isProfilePanelOpen = false;
+      state.isAuth = false;
+      state.userData = null;
+      state.isLoading = false;
     },
-    toggleProfilePanel: (state) => {
-      state.isProfilePanelOpen = !state.isProfilePanelOpen;
+    setLoading: (state, action) => {
+      state.isLoading = action.payload;
     },
-    closeProfilePanel: (state) => {
-      state.isProfilePanelOpen = false;
-    }
-  }
+  },
 });
 
-export const { login, logout, toggleProfilePanel, closeProfilePanel } = authSlice.actions;
+export const { login, logout, setLoading } = authSlice.actions;
 export default authSlice.reducer;
+
+
+
+/* Async action to check user authentication on page reload */
+// export const checkAuth = () => async (dispatch) => {
+//   dispatch(setLoading(true)); // Start loading
+//   try {
+//     const response = await axios.get("http://localhost:5000/user/current-user", {
+//       withCredentials: true,
+//     });
+//     if (response.data.success) {
+//       dispatch(login(response.data.user));
+//     } else {
+//       dispatch(logout());
+//     }
+//   } catch (error) {
+//     console.log("No user Logged In:");
+//     dispatch(logout());
+//   }
+// };
+
+/* Newly Auth */
+
+export const checkAuth = () => async (dispatch) => {
+  dispatch(setLoading(true)); // Start loading
+  try {
+    const response = await axios.get("http://localhost:5000/user/current-user", {
+      withCredentials: true,
+    });
+
+    if (response.data.success) {
+      dispatch(login(response.data.user));
+    } else {
+      dispatch(logout());
+    }
+  } catch (error) {
+    console.log("No user Logged In:");
+    dispatch(logout());
+  } finally {
+    dispatch(setLoading(false)); // ✅ Ensure loading stops even if there's an error
+  }
+};
+

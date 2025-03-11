@@ -1,22 +1,26 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Header, Footer } from "../components";
+import { Header, Footer, LoadingScreen } from "../components";
 import { useSelector } from "react-redux";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Eye, EyeOff } from "lucide-react";
+import { showErrorToast, showSuccessToast, showWarningToast } from "../util.js/toast";
+import axios from "axios";
 
 const SignupPage = () => {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [profilePreview, setProfilePreview] = useState(null);
-  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const darkMode = useSelector((state) => state.theme.darkMode);
+  const [isHovered, setIsHovered] = useState(false);
 
-  const validateEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const toggleShowPassword = () => {
+    setShowPassword(!showPassword);
   };
 
   const handleFileChange = (e) => {
@@ -33,40 +37,79 @@ const SignupPage = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setError("⚠ All fields are required.");
-      return;
-    }
-    if (!validateEmail(email)) {
-      setError("⚠ Please enter a valid email address.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("⚠ Password must be at least 6 characters long.");
-      return;
-    }
+    setIsLoading(true);
+  
+    try {
+      const formData = new FormData();
+      formData.append("fullname", name);
+      formData.append("email", email);
+      formData.append("password", password);
+      if (profileImage) {
+        formData.append("profileImage", profileImage);
+      }
+      const url = "http://localhost:5000/user/signup";
+      
+      const response = await axios.post(url, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-    // TODO: Implement backend signup logic
-    console.log("Signing up with:", name, email, password, profileImage);
-    setError("");
-    navigate("/dashboard"); // Redirect after signup
+      console.log("After Fetching in repsonse Query : Frontend");
+  
+      if (response.data.status === "warning") {
+        showWarningToast(response.data.message);
+        setIsLoading(false);
+        return;
+      }
+  
+      if (response.data.status === "error") {
+        showErrorToast(response.data.message);
+        setIsLoading(false);
+        return;
+      }
+  
+      showSuccessToast(response.data.message);
+      setIsLoading(false);
+      navigate("/login");
+  
+    } catch (err) {
+      showErrorToast(err.response?.data?.message || "Something went wrong!");
+      setIsLoading(false);
+    }
   };
+  
+  // Use the LoadingScreen component when loading
+  if (isLoading) {
+    return <LoadingScreen 
+      title="Creating Account" 
+      message="Please wait while we process your registration..." 
+    />;
+  }
 
   return (
-    <div className={`min-h-screen flex flex-col transition-all ${
+    <div className={`flex-grow flex flex-col transition-all ${
       darkMode 
         ? "bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white" 
         : "bg-gradient-to-br from-white via-blue-50 to-indigo-100 text-gray-800"
     }`}>
-      <Header />
       <main className="flex-grow flex flex-col items-center justify-center p-4 sm:p-6">
-        <div className={`w-full max-w-md p-5 rounded-lg shadow-xl relative ${
-          darkMode 
-            ? "border-2 border-sky-600 bg-slate-800" 
-            : "border border-sky-200 bg-white/90 backdrop-blur-sm"
-        }`}>
+        <motion.div
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          whileHover={{
+            scale: 1.01,
+            boxShadow: darkMode
+              ? "0 0 15px rgba(2, 132, 199, 0.4)"
+              : "0 0 15px rgba(6, 182, 212, 0.25)"
+          }}
+          transition={{ duration: 0.3 }}
+          className={`w-full max-w-md p-6 rounded-lg shadow-lg transition-all duration-200 relative ${
+            darkMode
+              ? "border-2 border-sky-600 bg-gradient-to-b from-slate-800 to-slate-900"
+              : "border-2 border-sky-400 bg-gradient-to-b from-white to-sky-50"
+          }`}
+        >
           {/* Profile Picture Preview - Positioned at the top overlapping with the container border */}
           <div className="absolute -top-5 left-1/2 transform -translate-x-1/2">
             <motion.div
@@ -99,28 +142,14 @@ const SignupPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1 }}
-            className={`text-xl font-bold text-center mt-11 ${
-              darkMode ? "text-cyan-400" : "text-cyan-600"
+            className={`text-2xl font-bold text-center mt-11 ${
+              darkMode ? "text-cyan-400" : "text-sky-600"
             }`}
           >
             Create Account
           </motion.p>
 
-          {/* Animated Error Message */}
-          <AnimatePresence>
-            {error && (
-              <motion.p
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="text-red-500 text-center font-semibold mt-1 text-sm"
-              >
-                {error}
-              </motion.p>
-            )}
-          </AnimatePresence>
-
-          <form onSubmit={handleSubmit} className="mt-4 flex flex-col space-y-4">
+          <form onSubmit={handleSubmit} className="mt-4 flex flex-col space-y-4" encType="multipart/form-data">
             <input
               type="text"
               placeholder="Full Name"
@@ -129,11 +158,11 @@ const SignupPage = () => {
                 setName(e.target.value);
                 if (error) setError("");
               }}
-              className={`w-full px-3 py-2 rounded-md border ${
-                darkMode 
-                  ? "bg-slate-700 border-slate-600 text-white focus:border-sky-500 placeholder-gray-400" 
-                  : "bg-blue-50/80 border-gray-300 focus:border-sky-500 text-gray-800 placeholder-gray-500"
-              } focus:outline-none`}
+              className={`w-full px-4 py-3 text-lg font-medium border-b-2 focus:outline-none transition-all duration-300 ${
+                darkMode
+                  ? "bg-transparent border-slate-600 text-white focus:border-sky-500 placeholder-gray-400"
+                  : "bg-transparent border-gray-300 focus:border-sky-500 text-gray-800 placeholder-gray-500"
+              } ${isHovered ? (darkMode ? "border-sky-400" : "border-sky-400") : ""}`}
               required
             />
             <input
@@ -144,31 +173,48 @@ const SignupPage = () => {
                 setEmail(e.target.value);
                 if (error) setError("");
               }}
-              className={`w-full px-3 py-2 rounded-md border ${
-                darkMode 
-                  ? "bg-slate-700 border-slate-600 text-white focus:border-sky-500 placeholder-gray-400" 
-                  : "bg-blue-50/80 border-gray-300 focus:border-sky-500 text-gray-800 placeholder-gray-500"
-              } focus:outline-none`}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) setError("");
-              }}
-              className={`w-full px-3 py-2 rounded-md border ${
-                darkMode 
-                  ? "bg-slate-700 border-slate-600 text-white focus:border-sky-500 placeholder-gray-400" 
-                  : "bg-blue-50/80 border-gray-300 focus:border-sky-500 text-gray-800 placeholder-gray-500"
-              } focus:outline-none`}
+              className={`w-full px-4 py-3 text-lg font-medium border-b-2 focus:outline-none transition-all duration-300 ${
+                darkMode
+                  ? "bg-transparent border-slate-600 text-white focus:border-sky-500 placeholder-gray-400"
+                  : "bg-transparent border-gray-300 focus:border-sky-500 text-gray-800 placeholder-gray-500"
+              } ${isHovered ? (darkMode ? "border-sky-400" : "border-sky-400") : ""}`}
               required
             />
             
+            {/* Password field with show/hide toggle */}
+            <div className="relative w-full">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError("");
+                }}
+                className={`w-full px-4 py-3 text-lg font-medium border-b-2 focus:outline-none transition-all duration-300 ${
+                  darkMode
+                    ? "bg-transparent border-slate-600 text-white focus:border-sky-500 placeholder-gray-400"
+                    : "bg-transparent border-gray-300 focus:border-sky-500 text-gray-800 placeholder-gray-500"
+                } ${isHovered ? (darkMode ? "border-sky-400" : "border-sky-400") : ""}`}
+                required
+              />
+              <button
+                type="button"
+                onClick={toggleShowPassword}
+                className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${
+                  darkMode ? "text-gray-300 hover:text-white" : "text-gray-500 hover:text-gray-700"
+                } transition-colors focus:outline-none`}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} className="cursor-pointer" />
+                ) : (
+                  <Eye size={18} className="cursor-pointer" />
+                )}
+              </button>
+            </div>
+            
             <div className="flex flex-col">
-              <label className={`text-xs mb-1 ${
+              <label className={`text-sm font-medium mb-1 ${
                 darkMode ? "text-gray-300" : "text-gray-600"
               }`}>
                 Profile Picture
@@ -177,27 +223,32 @@ const SignupPage = () => {
                 type="file"
                 accept="image/*"
                 onChange={handleFileChange}
-                className={`w-full px-3 py-1.5 rounded-lg text-sm ${
-                  darkMode ? "bg-slate-700 text-gray-300" : "bg-blue-50/80 text-gray-700"
-                }`}
+                className={`w-full px-4 py-2 rounded-lg text-sm border transition-all duration-300 ${
+                  darkMode 
+                    ? "bg-transparent border border-slate-600 text-gray-300 focus:border-sky-500" 
+                    : "bg-transparent border border-gray-300 text-gray-700 focus:border-sky-500"
+                } ${isHovered ? (darkMode ? "border-sky-400" : "border-sky-400") : ""}`}
               />
             </div>
 
             <motion.button
               type="submit"
-              whileHover={{ scale: 1.03, boxShadow: "0px 8px 15px rgba(14, 165, 233, 0.3)" }}
+              whileHover={{
+                scale: 1.03,
+                boxShadow: "0px 5px 10px rgba(14, 165, 233, 0.2)"
+              }}
               whileTap={{ scale: 0.95 }}
-              className={`flex items-center justify-center px-5 py-2 rounded-lg shadow-md transition-all ${
-                darkMode 
-                  ? "bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white" 
+              className={`flex items-center justify-center px-6 py-3 rounded-lg shadow-md transition-all duration-300 ${
+                darkMode
+                  ? "bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white"
                   : "bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white"
               }`}
             >
-              <UserPlus className="mr-2" size={16} />
+              <UserPlus className="mr-2" size={20} />
               Sign Up
             </motion.button>
 
-            <p className={`text-center text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+            <p className={`text-center ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
               Already have an account?{" "}
               <span
                 className={`cursor-pointer hover:underline ${
@@ -209,9 +260,8 @@ const SignupPage = () => {
               </span>
             </p>
           </form>
-        </div>
+        </motion.div>
       </main>
-      <Footer />
     </div>
   );
 };
